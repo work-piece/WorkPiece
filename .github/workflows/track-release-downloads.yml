@@ -1,0 +1,44 @@
+name: Track Release Downloads
+
+on:
+  schedule:
+    - cron: "5 0 * * *"
+      timezone: "Asia/Tokyo"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-download-tracker
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Collect Release download count
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python scripts/track_release_downloads.py
+
+      - name: Commit CSV when changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/download_history.csv
+          if git diff --cached --quiet; then
+            echo "CSVに変更はありません。"
+          else
+            git commit -m "chore: record release download count"
+            git push
+          fi
